@@ -1,0 +1,52 @@
+name: Publicar prototipo en GitHub Pages
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: pages
+  cancel-in-progress: false
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: source
+    steps:
+      - uses: actions/checkout@v4
+      - name: Extraer proyecto
+        working-directory: .
+        run: unzip -q academia-andina-source.zip -d source
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: source/package-lock.json
+      - run: npm ci
+      - run: npm run check
+      - run: npm test
+      - name: Compilar y comprobar
+        env:
+          BASE_PATH: /${{ github.event.repository.name }}/
+          SITE_URL: https://${{ github.repository_owner }}.github.io
+        run: |
+          npm run build
+          npm run test:build
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: source/dist
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Publicar
+        id: deployment
+        uses: actions/deploy-pages@v4
